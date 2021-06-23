@@ -3,14 +3,20 @@ import pandas as pd
 import os
 import mysql.connector
 from mysql.connector import Error
+from dotenv import load_dotenv
+from tweepy import cursor
+import re
+from nltk.tokenize import word_tokenize
+load_dotenv()
 
 
-consumer_key = 'uHDSs2qfSH181ESHrFv9VaIJV'
-consumer_secret_key = 'y0bFMfl0V6CVc8pyAPVaKCP2RBmkiqH59SIwV5TVQpCG6ES1ng'
-access_token = '1407348469749235721-4KShsGkIWBZWGptF37H8rAdMYSFXu9'
-access_secret_token = 'xsDeoZMJ1yxoZ1UUuG2KwRO6lg789RzywPSiwrl2T867j'
+consumer_key = os.environ.get('consumer_key')
+secret_key = os.environ.get('consumer_secret_key')
+access_token = os.environ.get('access_token')
+access_secret_token = os.environ.get('access_secret_token')
+auth = tw.OAuthHandler(consumer_key,secret_key)
 
-auth = tw.OAuthHandler(consumer_key,consumer_secret_key)
+
 auth.set_access_token(access_token,access_secret_token)
 api = tw.API(auth,wait_on_rate_limit=True)
 
@@ -25,10 +31,12 @@ tweets = tw.Cursor(api.search,q=new_search, lang='en',since=date_since, tweet_mo
 
 user_info = [[tweet.user.screen_name, tweet.full_text] for tweet in tweets]
 
-print(user_info)
-
+host = os.environ.get('host')
+database = os.environ.get('database')
+user = os.environ.get('user')
+password = os.environ.get('password')
 try:
-    connection = mysql.connector.connect(host='database-1.c6k1fqjq7oqw.us-east-2.rds.amazonaws.com',database='user_tweet',user='admin',password='Maulish1306')
+    connection = mysql.connector.connect(host=host,database=database,user=user,password=password)
     if connection.is_connected():
         print('connection Successfully')
 except Error as e:
@@ -36,11 +44,33 @@ except Error as e:
 
 mycursor = connection.cursor()
 
+#for user in user_info:
+#    sql = 'insert into user (username,tweet) values (%s,%s)'
+#    val = (user[0],user[1])
+#    mycursor.execute(sql,val)
+#    connection.commit()
 
-for user in user_info:
-    sql = 'insert into user (username,tweet) values (%s,%s)'
-    val = (user[0],user[1])
+#print('record inserted')
+
+
+query = 'select tweet from user'
+mycursor.execute(query)
+result = mycursor.fetchall()
+clean_tweets = []
+for url in result:
+    #print(url[0])
+    res = re.sub(r"http\S+","",url[0])
+    clean_tweets.append(res)
+    #print(res)
+
+
+for user,res in zip(user_info, clean_tweets):
+    sql = 'insert into clean_data (username,clean_tweet) values (%s,%s)'
+    val = (user[0],res)
     mycursor.execute(sql,val)
     connection.commit()
 
-print('record inserted')
+print('data inserted successfully')
+
+
+
