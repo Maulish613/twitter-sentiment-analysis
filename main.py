@@ -1,76 +1,65 @@
+from typing import final
+from mysql.connector.utils import validate_normalized_unicode_string
+from nltk import data
+from nltk import tokenize
+from numpy import negative, record, result_type
 import tweepy as tw
 import pandas as pd
 import os
-import mysql.connector
-from mysql.connector import Error
-from dotenv import load_dotenv
+import connection
 from tweepy import cursor
 import re
+import nltk
 from nltk.tokenize import word_tokenize
-load_dotenv()
+from itertools import chain
+#nltk.download()
+
+negative_file = open('negative-words.txt')
+positive_file = open('positive-words.txt')
+
+negative_words = []
+positive_words = []
+
+for neg,pos in zip(negative_file,positive_file):
+    negative_words.append(neg.rstrip("\n"))
+    positive_words.append(pos.rstrip("\n"))
 
 
-consumer_key = os.environ.get('consumer_key')
-secret_key = os.environ.get('consumer_secret_key')
-access_token = os.environ.get('access_token')
-access_secret_token = os.environ.get('access_secret_token')
-auth = tw.OAuthHandler(consumer_key,secret_key)
+def sentiment_analysis():
+    username = []
+    tweets = []
+    fetch = connection.fetch_function('select username,clean_tweet from clean_data')
+    
+    #print(records)
+    for record in fetch:
+        username.append(record[0])
+        tweets.append(record[1])
+    
+
+    for username,tweet in zip(username,tweets):
+        tokenize = nltk.word_tokenize(tweet)
+        #print(tokenize)
+        pos_data = set(tokenize)&set(positive_words)
+        #print(pos_data)
+        pos_data_list = list(pos_data)
+        print(pos_data_list)
+        neg_data = set(tokenize)&set(negative_words)
+        #print(neg_data)
+        neg_data_list = list(neg_data)
+        if len(pos_data_list)>len(neg_data_list):
+            result = 'positive tweet'
+        elif len(pos_data_list)<len(neg_data_list):
+            result = "negative tweet"
+        else:
+            result = "nuteral tweet"
+        print(result)
+         
+#sentiment_analysis()
 
 
-auth.set_access_token(access_token,access_secret_token)
-api = tw.API(auth,wait_on_rate_limit=True)
-
-search_words = '#education'
-date_since = "2018-11-16"
-tweets = tw.Cursor(api.search,q=search_words, lang='en',since=date_since).items(5)
+     
 
 
-new_search = search_words + ' -filter:retweets '
-
-tweets = tw.Cursor(api.search,q=new_search, lang='en',since=date_since, tweet_mode='extended').items(5)
-
-user_info = [[tweet.user.screen_name, tweet.full_text] for tweet in tweets]
-
-host = os.environ.get('host')
-database = os.environ.get('database')
-user = os.environ.get('user')
-password = os.environ.get('password')
-try:
-    connection = mysql.connector.connect(host=host,database=database,user=user,password=password)
-    if connection.is_connected():
-        print('connection Successfully')
-except Error as e:
-    print('something went wrong')
-
-mycursor = connection.cursor()
-
-#for user in user_info:
-#    sql = 'insert into user (username,tweet) values (%s,%s)'
-#    val = (user[0],user[1])
-#    mycursor.execute(sql,val)
-#    connection.commit()
-
-#print('record inserted')
-
-
-query = 'select tweet from user'
-mycursor.execute(query)
-result = mycursor.fetchall()
-clean_tweets = []
-for url in result:
-    #print(url[0])
-    res = re.sub(r"http\S+","",url[0])
-    clean_tweets.append(res)
-    #print(res)
-
-
-for user,res in zip(user_info, clean_tweets):
-    sql = 'insert into clean_data (username,clean_tweet) values (%s,%s)'
-    val = (user[0],res)
-    mycursor.execute(sql,val)
-    connection.commit()
-
-print('data inserted successfully')
 
 
 
